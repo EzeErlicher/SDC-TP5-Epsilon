@@ -64,10 +64,11 @@ static int my_open(struct inode *i, struct file *f) {
 
 /**
  * 
- *
+ * Copies the sampled values to userspace.
  * @param file Pointer to the file structure
- * @param buf User buffer to store data
+ * @param buf A pointer to the user-space buffer where the data should be copied to.
  * @param num_of_bytes Number of bytes to read
+ * @param offset The current file offset; used to prevent multiple reads returning the same data.
  * @return Number of bytes read on success, negative value on failure
  */
 ssize_t my_read(struct file *file, char __user *buf, size_t num_of_bytes,loff_t *offset) {
@@ -93,43 +94,16 @@ ssize_t my_read(struct file *file, char __user *buf, size_t num_of_bytes,loff_t 
 
 }
 
-/**
- * It allows userspace programs to choose between two GPIO pins (IO_A or IO_B) 
- * to read values from
- * 
- * @param file Pointer to the file structure
- * @param buf User buffer containing data to write
- * @param num_of_bytes Number of bytes to write
- * @param off Offset within the file
- * @return Number of bytes written on success, negative value on failure
- */
-
-static ssize_t my_write(struct file *file, const char __user *buf, size_t num_of_bytes,
-                        loff_t *off) {
-  char kbuf[1];
-
-  if (num_of_bytes == 0)
-    return 0;
-
-  if (copy_from_user(kbuf, buf, 1)) {
-    return -EFAULT;
-  }
-
-  printk("Write called with value: %c\n", kbuf[0]);
-
-  return num_of_bytes;
-}
 
 /** File operations structure */
 static struct file_operations my_fops = {
     .read = my_read,
-    .write = my_write,
     .open = my_open,
     .release = my_release,
 };
 
 /**
- * Called every second.Reads current GPIO value and stores it in last_value.
+ * Called every second 200ms .Reads current GPIOs values and stores them .
  * Re-enqueues itself for continuous polling.
  * 
  * @param work Pointer to the work structure
@@ -217,7 +191,7 @@ int __init my_init(void) {
   
   /** 
    * Dynamically allocates a major number (and one minor number starting from 0) 
-   * for your character device.
+   * for the character device.
    
    * first: where the assigned device number will be stored.
    * 0: starting minor number.
@@ -259,7 +233,7 @@ int __init my_init(void) {
   }
   
   /**
-   * cdev_init: Initializes the cdev structure with your file_operations (read, write, etc.).
+   * cdev_init: Initializes the cdev structure with custom file_operations (read, write, etc.).
    * cdev_add: Adds the character device to the kernel so it can start handling syscalls.
    * If it fails it destroys the device node, class, unregister the device number,and free the GPIOs. 
    */ 
