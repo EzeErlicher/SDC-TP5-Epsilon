@@ -18,23 +18,23 @@
 
 
 /* GPIO pins */
-#define PIN_A 111 // See which number are required for a particular pin
-#define PIN_B 222
-#define SAMPLE_BUFFER_SIZE 10
+#define PIN_A 526 // pin 14
+#define PIN_B 527 // pin 15 
+#define SAMPLE_BUFFER_SIZE 50
 
 /* Globals */
-static char sample_buffer[SAMPLE_BUFFER_SIZE];
+static char sample_buffer_PIN_A[SAMPLE_BUFFER_SIZE];
+static char sample_buffer_PIN_B[SAMPLE_BUFFER_SIZE];
 static int sample_index = 0;
 static int sample_count = 0;
 static dev_t first;       // first device number 
 static struct cdev c_dev; // character device structure 
 static struct class *cl;  // device class 
-static int chosen_pin = PIN_A;   // Selected GPIO to read 
 static struct delayed_work my_work;    // Delayed work structure to poll GPIO periodically
 static struct workqueue_struct *my_wq; // Workqueue structure 
 
 static char last_value[8] = "0\n"; // Buffer to store the last read value
-static int read_period = 2*HZ;       //2 second delay 
+static int read_period = HZ/5;   //2 second delay 
 
 /* ---------------- */
 /* File operations */
@@ -63,8 +63,8 @@ static int my_open(struct inode *i, struct file *f) {
 }
 
 /**
- * Copies the content of last_value (most recently read GPIO value) to the user space.
- * Limits copy size to 8 bytes.
+ * 
+ *
  * @param file Pointer to the file structure
  * @param buf User buffer to store data
  * @param num_of_bytes Number of bytes to read
@@ -72,25 +72,24 @@ static int my_open(struct inode *i, struct file *f) {
  */
 ssize_t my_read(struct file *file, char __user *buf, size_t num_of_bytes,loff_t *offset) {
 
-  char temp_buffer[SAMPLE_BUFFER_SIZE];
-  int i;
-  int index;
+  char temp_buffer[2 * SAMPLE_BUFFER_SIZE] = {0};
+  int i, index;
 
-  if (*offset > 0) {
-    return 0; // Allow only one read
-  }
+  if (*offset > 0)
+    return 0; // Only allow one read per open
 
   for (i = 0; i < sample_count; i++) {
-    index = (sample_index + i) % SAMPLE_BUFFER_SIZE;
-    temp_buffer[i] = sample_buffer[index];
+    index = (sample_index + SAMPLE_BUFFER_SIZE - sample_count + i) % SAMPLE_BUFFER_SIZE;
+    temp_buffer[i] = sample_buffer_PIN_A[index];           // First signal
+    temp_buffer[SAMPLE_BUFFER_SIZE + i] = sample_buffer_PIN_B[index]; // Second signal
   }
 
-  if (copy_to_user(buf, temp_buffer, sample_count)) {
+  if (copy_to_user(buf, temp_buffer, 2 * sample_count))
     return -EFAULT;
-  }
 
-  *offset += sample_count;
-  return sample_count;
+  *offset += 2 * sample_count;
+
+  return 2 * sample_count;
 
 }
 
@@ -104,27 +103,19 @@ ssize_t my_read(struct file *file, char __user *buf, size_t num_of_bytes,loff_t 
  * @param off Offset within the file
  * @return Number of bytes written on success, negative value on failure
  */
+
 static ssize_t my_write(struct file *file, const char __user *buf, size_t num_of_bytes,
-                          loff_t *off) {
-  
-  u8 val;
+                        loff_t *off) {
+  char kbuf[1];
 
   if (num_of_bytes == 0)
     return 0;
 
-  char kbuf[1];
   if (copy_from_user(kbuf, buf, 1)) {
     return -EFAULT;
   }
-  val = kbuf[0] - '0'; // convert ascii char to int
 
-  if (val == 0) {
-    chosen_pin = PIN_A;
-  } else {
-    chosen_pin = PIN_B;
-  }
-
-  printk("chosen GPIO: %d\n", chosen_pin - 512);
+  printk("Write called with value: %c\n", kbuf[0]);
 
   return num_of_bytes;
 }
@@ -145,14 +136,16 @@ static struct file_operations my_fops = {
  */
 static void take_sample(struct work_struct *work) {
 
-  u8 value = gpio_get_value(chosen_pin);
+  u8 value_a = gpio_get_value(PIN_A);
+  u8 value_b = gpio_get_value(PIN_B);
 
-  sample_buffer[sample_index] = value ? '1' : '0';
-  sample_index = (sample_index + 1) % SAMPLE_BUFFER_SIZE; 
+  sample_buffer_PIN_A[sample_index] = value_a ? '1' : '0';
+  sample_buffer_PIN_B[sample_index] = value_b ? '1' : '0';
 
-  if (sample_count < SAMPLE_BUFFER_SIZE) {
+  sample_index = (sample_index + 1) % SAMPLE_BUFFER_SIZE;
+
+  if (sample_count < SAMPLE_BUFFER_SIZE)
     sample_count++;
-  }
 
   queue_delayed_work(my_wq, &my_work, read_period);
 }
