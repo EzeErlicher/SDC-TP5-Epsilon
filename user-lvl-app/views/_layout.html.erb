@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Epsilon</title>
+  <link rel='stylesheet' type='text/css' href='/styles/_main.css'>
+  <%= @style ? "<link rel='stylesheet' type='text/css' href='/styles/#{@style}.css'>" : nil %>
+  <%= @script ? "<script src='/scripts/#{@script}.js'></script>" : nil %>
+</head>
+<body>
+  <h2>FCEFyN UNC</h2>
+  <h1>Sistemas de Computación</h1>
+  <h4>TP 5: user level app</h4><br>
+  <%= @content %>
+</body>
+</html>

@@ -1,0 +1,16 @@
+#chart-container {
+  width: 500px;
+  height: 300px;
+  margin: 20px 0 20px 40px;
+}
+
+canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#switch-button {
+  margin-left: 40px;
+  padding: 6px 12px;
+  font-size: 14px;
+}

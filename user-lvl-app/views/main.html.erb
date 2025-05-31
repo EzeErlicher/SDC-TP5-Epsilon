@@ -1,0 +1,63 @@
+<div id="chart-container">
+  <canvas id="signalChart"></canvas>
+</div>
+
+<button id="switch-button">Cambiar a Señal 2</button>
+
+<script>
+  const signals = <%= @signals_data.to_json %>;
+  let currentSignal = 0;
+
+  const ctx = document.getElementById('signalChart');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: signals[currentSignal].map((_, i) => `t=${(i * 0.2).toFixed(1)}s`),
+      datasets: [{
+        label: 'Señal 1',
+        data: signals[currentSignal],
+        fill: false,
+        borderColor: 'blue',
+        tension: 0.1
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Tiempo (s)'
+          }
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Valor digital'
+          },
+          min: 0,
+          max: 1,
+          ticks: {
+            stepSize: 1,
+            callback: function(value) {
+              return value === 0 || value === 1 ? value : '';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  document.getElementById('switch-button').addEventListener('click', () => {
+    currentSignal = 1 - currentSignal;
+    const newData = signals[currentSignal];
+
+    chart.data.labels = newData.map((_, i) => `t=${(i * 0.2).toFixed(1)}s`);
+    chart.data.datasets[0].data = newData;
+    chart.data.datasets[0].label = `Señal ${currentSignal + 1}`;
+    chart.update();
+
+    document.getElementById('switch-button').textContent =
+      currentSignal === 0 ? 'Cambiar a Señal 2' : 'Cambiar a Señal 1';
+  });
+</script>
