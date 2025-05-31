@@ -20,6 +20,7 @@ class Webserver
     'Server' => 'Puma'
   }.freeze
   CDD_PATH_ON_RASPBERRY_PI = '/dev/signals_reader'.freeze
+  SAMPLES_PER_SIGNAL = 50
 
   # @param env [Hash<String, String>]
   # @return [Array(Integer, Hash<String, String>, Array<String>)]
@@ -35,17 +36,12 @@ class Webserver
     if((@req = req).get?)
       case(req.path)
         when('/')
-          # TODO: Uncomment on production
-=begin
-          # expecting i.e.: "[[v_0, v_1, ..., v_49], [w_0, w_1, ..., v_49]]"
+          # according to `cat CDD_PATH_ON_RASPBERRY_PI` expecting binary string i.e.: "0101010101011100101010101001" 
           raw_signals_data = \
             Net::SSH.start(ENV['RASPBERRY_PI_IP'], ENV['RASPBERRY_PI_HOST_NAME'], password: ENV['RASPBERRY_PI_PASSWORD']) do |ssh|
               ssh.exec!("cat #{CDD_PATH_ON_RASPBERRY_PI}")
             end
-          @signals_data = eval(raw_signals_data)
-=end
-          # WARNING: Mock values
-          @signals_data = [[0, 2, 4, 6, 8, 10, 12, 14, 16, 14, 12, 10, 8, 6, 4, 2, 0], [8, 5, 1, 5, 8, 11, 14, 11, 8, 5, 1, 5, 8, 11, 14, 11, 8]]
+          @signals_data = [raw_signals_data.chars[0...SAMPLES_PER_SIGNAL].map {|c| c.to_i}, raw_signals_data.chars[SAMPLES_PER_SIGNAL..-1].map {|c| c.to_i}]
           [200, HTTP_HEADER_TEMPLATE, [render('main')]]
         when('/alive')
           # alive check, test/debugging purpose
@@ -57,7 +53,7 @@ class Webserver
       DEFAULT_RESPONSE
     end
   end
-
+  
   # @param view [String]
   # @param req [NilClass, Rack::Request]
   def render(view)
